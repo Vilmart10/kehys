@@ -1,0 +1,1003 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kehys</title>
+<meta name="description" content="Reunukset ja artkehykset valmiisiin kuviin. Kuvat käsitellään laitteella.">
+<meta name="theme-color" content="#1b1a19">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kehys">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<style>
+/* Pimiö: tumma työpöytä, kuva keskellä, säätimet oikealla (pystyssä alla). Yksi tumma teema tarkoituksella. */
+:root {
+  color-scheme: dark;
+  --bg: #1b1a19;          /* työpöytä */
+  --panel: #242321;       /* paneeli */
+  --well: #2e2c29;        /* kentät */
+  --line: #3b3935;
+  --fg: #e6e2da;
+  --muted: #9a958b;
+  --accent: #d4892f;      /* pimiövalon meripihka */
+  --accent-ink: #1b1a19;
+  --warn: #e0a040;
+  --ok: #7fae6e;
+  --f-ui: -apple-system, system-ui, "Helvetica Neue", sans-serif;
+  --f-head: -apple-system, system-ui, "Helvetica Neue", sans-serif;
+  --f-num: ui-monospace, "SF Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.4 var(--f-ui); overflow: hidden; -webkit-text-size-adjust: 100%; }
+button, input, select { font: inherit; color: inherit; }
+.app { display: grid; grid-template-columns: minmax(0, 1fr) 380px; height: 100%; padding-top: env(safe-area-inset-top, 0px);
+  padding-left: max(0px, env(safe-area-inset-left, 0px)); padding-right: max(0px, env(safe-area-inset-right, 0px)); }
+.stage { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; min-height: 0; }
+.bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+.brand { font: 600 18px var(--f-head); letter-spacing: .02em; margin-right: auto; }
+.brand small { font: 400 12px var(--f-ui); color: var(--muted); margin-left: 6px; letter-spacing: 0; }
+.btn { background: var(--well); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; min-height: 36px; }
+.btn:hover { border-color: #57534c; }
+.btn:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.btn:disabled { opacity: .45; cursor: default; }
+.view { position: relative; display: grid; place-items: center; min-height: 0; padding: 16px; }
+.view canvas { max-width: 100%; max-height: 100%; box-shadow: 0 6px 30px rgba(0,0,0,.45); background: #000; }
+.busy { position: absolute; top: 12px; right: 16px; font: 12px var(--f-num); color: var(--muted); }
+.strip { display: flex; gap: 8px; overflow-x: auto; padding: 8px 16px 12px; border-top: 1px solid var(--line); min-height: 92px; align-items: center; }
+.thumb { position: relative; flex: 0 0 auto; width: 72px; height: 72px; border-radius: 4px; overflow: hidden; border: 2px solid transparent; cursor: pointer; background: var(--well); padding: 0; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb.on { border-color: var(--accent); }
+.thumb .x { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; border: 0; background: rgba(0,0,0,.65); color: #fff; font-size: 13px; line-height: 22px; cursor: pointer; }
+.strip .empty { color: var(--muted); font-size: 13px; }
+.info { font: 12px var(--f-num); color: var(--muted); padding: 0 16px 8px; }
+
+.side { min-width: 0; overflow: hidden; background: var(--panel); border-left: 1px solid var(--line); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; }
+.presets { padding: 12px 14px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+.presets select { width: 100%; }
+.state { font-size: 12px; color: var(--muted); }
+.state.dirty { color: var(--warn); }
+.row-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.row-btns .btn { flex: 1 1 auto; padding: 6px 8px; font-size: 14px; }
+.inline { display: flex; gap: 6px; }
+.inline input { flex: 1; min-width: 0; }
+.form { overflow-y: auto; padding: 8px 10px 16px; -webkit-overflow-scrolling: touch; }
+details.sec { border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px; background: #262522; }
+details.sec > summary { list-style: none; display: flex; align-items: center; gap: 8px; padding: 9px 10px; cursor: pointer; font: 600 15px var(--f-head); letter-spacing: .02em; }
+details.sec > summary::-webkit-details-marker { display: none; }
+details.sec > summary::before { content: "▸"; color: var(--muted); width: 10px; transition: transform .15s; }
+details.sec[open] > summary::before { transform: rotate(90deg); }
+summary .tog { margin-left: auto; display: flex; gap: 6px; align-items: center; font: 400 13px var(--f-ui); color: var(--muted); }
+.body { padding: 2px 10px 10px; display: grid; gap: 8px; }
+.body.off { opacity: .4; }
+.f { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 8px; align-items: center; }
+.f > label { font-size: 13px; line-height: 1.2; color: var(--muted); text-align: right; }
+.f .ctl { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.f input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); }
+.f input[type=number] { width: 64px; font: 13px var(--f-num); }
+.f select { flex: 1; min-width: 0; }
+input[type=number], input[type=text], select { background: var(--well); border: 1px solid var(--line); border-radius: 5px; padding: 6px 7px; }
+input[type=color] { width: 64px; height: 30px; border: 1px solid var(--line); border-radius: 5px; background: var(--well); padding: 2px; }
+.sub { font: 600 13px var(--f-head); color: var(--fg); letter-spacing: .04em; text-transform: uppercase; padding-top: 6px; }
+.hint { font-size: 12px; color: var(--muted); }
+.unit { width: 18px; flex: 0 0 18px; }
+.save { padding: 12px 14px; border-top: 1px solid var(--line); display: grid; gap: 8px; padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); }
+.save .row-btns .btn { font-size: 15px; }
+.msg { font-size: 13px; color: var(--muted); min-height: 1.2em; }
+.msg.err { color: #e07a5f; }
+.msg.ok { color: var(--ok); }
+.hidden-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+@media (max-width: 900px) {
+  body { overflow: auto; }
+  .app { grid-template-columns: 1fr; height: auto; }
+  .stage { grid-template-rows: auto auto auto auto; }
+  .view canvas { max-height: 60vh; }
+  .side { border-left: 0; border-top: 1px solid var(--line); }
+  .bar, .strip, .info { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <main class="stage">
+    <div class="bar">
+      <div class="brand">Kehys <small>iPad</small></div>
+      <button class="btn primary" id="add">Lisää kuvia…</button>
+      <button class="btn" id="clear">Tyhjennä</button>
+      <input class="hidden-input" type="file" id="file" accept="image/*" multiple>
+    </div>
+    <div class="view" id="view"><canvas id="pv" width="10" height="10" aria-label="Esikatselu"></canvas><div class="busy" id="busy"></div></div>
+    <div>
+      <div class="info" id="info"></div>
+      <div class="strip" id="strip"></div>
+    </div>
+  </main>
+
+  <aside class="side">
+    <div class="presets">
+      <select id="preset" aria-label="Esiasetus"></select>
+      <div class="state" id="state"></div>
+      <div class="row-btns">
+        <button class="btn" id="pSave">Tallenna</button>
+        <button class="btn" id="pNew">Tallenna uutena…</button>
+        <button class="btn" id="pRevert">Palauta</button>
+      </div>
+      <div class="inline" id="newRow" hidden>
+        <input type="text" id="newName" aria-label="Uuden esiasetuksen nimi">
+        <button class="btn primary" id="newOk">Tallenna</button>
+        <button class="btn" id="newCancel">Peru</button>
+      </div>
+      <div class="row-btns">
+        <button class="btn" id="pRename">Nimeä…</button>
+        <button class="btn" id="pDel">Poista…</button>
+        <button class="btn" id="pImport">Tuo…</button>
+        <button class="btn" id="pExport">Vie…</button>
+        <input class="hidden-input" type="file" id="importFile" accept=".json,application/json">
+      </div>
+      <div class="inline" id="delRow" hidden>
+        <span class="state dirty" style="flex:1">Poistetaanko esiasetus?</span>
+        <button class="btn" id="delOk">Poista</button>
+        <button class="btn" id="delCancel">Peru</button>
+      </div>
+    </div>
+    <div class="form" id="form"></div>
+    <div class="save">
+      <div class="row-btns">
+        <button class="btn primary" id="saveOne">Tallenna tämä kuva</button>
+        <button class="btn" id="saveAll">Tallenna kaikki</button>
+      </div>
+      <button class="btn primary" id="shareReady" hidden>Jaa / tallenna</button>
+      <div class="msg" id="msg"></div>
+    </div>
+  </aside>
+</div>
+
+<script>
+/* ===================== Kehys-moottori (iPad) ===================== */
+const K = (() => {
+  const clamp = (v, a = 0, b = 1) => (v < a ? a : v > b ? b : v);
+  const hex = (h) => {
+    h = String(h || "#000").replace("#", "");
+    if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+    return [parseInt(h.slice(0, 2), 16) || 0, parseInt(h.slice(2, 4), 16) || 0, parseInt(h.slice(4, 6), 16) || 0];
+  };
+  function mulberry(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function hashSeed(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  // Pehmeä satunnaiskenttä [-1,1], piirteiden koko ~cell px (cellX: eri vaakakoko → venytetyt juovat)
+  class Noise {
+    constructor(H, W, cell, R, cellX) {
+      this.cy = Math.max(2, cell);
+      this.cx = Math.max(2, cellX == null ? cell : cellX);
+      this.gh = Math.ceil(H / this.cy) + 4;
+      this.gw = Math.ceil(W / this.cx) + 4;
+      const g = (this.g = new Float32Array(this.gh * this.gw));
+      for (let i = 0; i < g.length; i++) g[i] = R() * 2 - 1;
+    }
+    at(x, y) {
+      const fx = x / this.cx + 1, fy = y / this.cy + 1;
+      const ix = fx | 0, iy = fy | 0, tx = fx - ix, ty = fy - iy;
+      const wx0 = ((-tx + 2) * tx - 1) * tx * 0.5, wx1 = ((3 * tx - 5) * tx * tx + 2) * 0.5,
+        wx2 = ((-3 * tx + 4) * tx + 1) * tx * 0.5, wx3 = (tx - 1) * tx * tx * 0.5;
+      const wy0 = ((-ty + 2) * ty - 1) * ty * 0.5, wy1 = ((3 * ty - 5) * ty * ty + 2) * 0.5,
+        wy2 = ((-3 * ty + 4) * ty + 1) * ty * 0.5, wy3 = (ty - 1) * ty * ty * 0.5;
+      const g = this.g, gw = this.gw;
+      let r = (iy - 1) * gw + ix - 1, s = 0;
+      s += wy0 * (wx0 * g[r] + wx1 * g[r + 1] + wx2 * g[r + 2] + wx3 * g[r + 3]); r += gw;
+      s += wy1 * (wx0 * g[r] + wx1 * g[r + 1] + wx2 * g[r + 2] + wx3 * g[r + 3]); r += gw;
+      s += wy2 * (wx0 * g[r] + wx1 * g[r + 1] + wx2 * g[r + 2] + wx3 * g[r + 3]); r += gw;
+      s += wy3 * (wx0 * g[r] + wx1 * g[r + 1] + wx2 * g[r + 2] + wx3 * g[r + 3]);
+      return s;
+    }
+  }
+  // reunan suuntaiset juovat: [vaakajuovat, pystyjuovat]
+  const SN = (H, W, R, along, across) => [new Noise(H, W, across, R, along), new Noise(H, W, along, R, across)];
+  const sn = (p, x, y, sw) => p[0].at(x, y) * (1 - sw) + p[1].at(x, y) * sw;
+  // etäisyys pyöristettyyn suorakaiteeseen (< 0 sisällä)
+  const sdf = (qx, qy, r) => {
+    const ox = qx > 0 ? qx : 0, oy = qy > 0 ? qy : 0;
+    const m = qx > qy ? qx : qy;
+    return Math.sqrt(ox * ox + oy * oy) + (m < 0 ? m : 0) - r;
+  };
+  function mk(w, h) {
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(w));
+    c.height = Math.max(1, Math.round(h));
+    return c;
+  }
+  function ctx2d(c) { return c.getContext("2d", { willReadFrequently: true }); }
+
+  // ---------- mitat (käytetään myös koon laskemiseen ilman piirtoa) ----------
+  function filmDims(w, h, f) {
+    const s = Math.min(w, h);
+    if (f.tyyli === "polaroid") {
+      const side = Math.max(2, f.paperi / 100 * s), top = side * 1.2;
+      const bottom = Math.max(side, (+f.alareuna || 27) / 100 * s);
+      return [Math.round(w + 2 * side), Math.round(h + top + bottom)];
+    }
+    const band = Math.max(2, f.leveys / 100 * s), inset = band * f.yli / 100;
+    const E = Math.round(band - inset + f.paperi / 100 * s + band * 0.6);
+    if (f.tyyli === "revitty") {
+      const E2 = Math.round((f.taustaleveys == null ? 5 : +f.taustaleveys) / 100 * s);
+      return [w + 2 * (E + E2), h + 2 * (E + E2)];
+    }
+    return [w + 2 * E, h + 2 * E];
+  }
+  function padDims(w, h, t) {
+    if (!t.suhde || t.suhde === "ei") return [w, h];
+    const [a, b] = t.suhde.split(":").map(Number), target = a / b;
+    if (Math.abs(w / h - target) < 1e-3) return [w, h];
+    return w / h > target ? [w, Math.round(w / target)] : [Math.round(h * target), h];
+  }
+  function borderDims(w, h, r) {
+    const v = +r.arvo || 0;
+    if (r.tapa === "ei" || v <= 0) return [w, h];
+    let dx, dy;
+    if (r.tapa === "ps_pros") { dx = w * v / 100; dy = h * v / 100; }
+    else if (r.tapa === "pros_pidempi") { dx = dy = Math.max(w, h) * v / 100; }
+    else { dx = dy = 2 * v; }
+    return [Math.round(w + dx), Math.round(h + dy)];
+  }
+  function finalTarget(t) {
+    const k = t.loppu || "ei";
+    if (k === "ig") return ["leveys", 1080];
+    if (k === "fb") return ["pidempi", 2048];
+    if (k === "leveys" || k === "pidempi") return [k, +t.loppuleveys || 0];
+    return [null, 0];
+  }
+  function finalDims(w, h, t) {
+    const [tapa, px] = finalTarget(t);
+    if (!tapa || px <= 0) return [w, h];
+    const k = tapa === "leveys" ? px / w : px / Math.max(w, h);
+    return k >= 1 ? [w, h] : [Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k))];
+  }
+  function workDims(w, h, k) {
+    const px = +k.px || 0;
+    if (k.tapa === "ei" || px <= 0) return [w, h];
+    if (k.tapa === "leveys") return [px, Math.round(h * px / w)];
+    if (k.tapa === "korkeus") return [Math.round(w * px / h), px];
+    const q = px / Math.max(w, h);
+    return [Math.round(w * q), Math.round(h * q)];
+  }
+  // Koko valmiille kuvalle ilman piirtoa (pxScale: viivan ja px-reunuksen mittakaava)
+  function simulate(w, h, p, pxScale = 1) {
+    [w, h] = workDims(w, h, p.koko);
+    if (p.filmi.kaytossa) [w, h] = filmDims(w, h, p.filmi);
+    if (p.reunukset.kaytossa) {
+      const vp = Math.round((+p.viiva.px || 0) * pxScale);
+      if (vp > 0) { w += 2 * vp; h += 2 * vp; }
+      [w, h] = padDims(w, h, p.taytto);
+      const r = p.reunus.tapa === "px" ? { ...p.reunus, arvo: (+p.reunus.arvo || 0) * pxScale } : p.reunus;
+      [w, h] = borderDims(w, h, r);
+    }
+    return [w, h];
+  }
+
+  // ---------- skaalaus (Safari: pienennys puolittamalla laadun vuoksi) ----------
+  function scaleTo(src, w, h) {
+    w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
+    let cur = src, cw = src.naturalWidth || src.width, ch = src.naturalHeight || src.height;
+    if (cw === w && ch === h && src instanceof HTMLCanvasElement) return src;
+    while (cw / 2 >= w && ch / 2 >= h && cw * ch <= 16e6) {
+      const n = mk(cw / 2, ch / 2), c = n.getContext("2d");
+      c.imageSmoothingQuality = "high";
+      c.drawImage(cur, 0, 0, n.width, n.height);
+      cur = n; cw = n.width; ch = n.height;
+    }
+    const out = mk(w, h), c = out.getContext("2d");
+    c.imageSmoothingQuality = "high";
+    c.drawImage(cur, 0, 0, w, h);
+    return out;
+  }
+
+  // ---------- Artkehys: sivellin ----------
+  function frameSivellin(img, f, seed) {
+    const w = img.width, h = img.height, s = Math.min(w, h);
+    const band = Math.max(2, f.leveys / 100 * s), inset = band * f.yli / 100, outW = band - inset;
+    const [W, H] = filmDims(w, h, f), E = (W - w) / 2;
+    const c = mk(W, H), x2 = ctx2d(c);
+    x2.fillStyle = f.paperivari; x2.fillRect(0, 0, W, H); x2.drawImage(img, E, E);
+    const id = x2.getImageData(0, 0, W, H), px = id.data;
+    const R = mulberry(seed), rough = f.rosoisuus / 100, wave = f.aaltoilu / 100, r = f.kulmat / 100 * s;
+    const N = (cell, cx) => new Noise(H, W, cell, R, cx);
+    const o1 = SN(H, W, R, band * 1.6, band * 0.1), o2 = SN(H, W, R, band * 0.6, band * 0.05), o3 = N(band * 0.15), ow = N(s * 0.08);
+    const i1 = SN(H, W, R, band * 1.2, band * 0.12), i3 = N(band * 0.15), iw = N(s * 0.08);
+    const spl = f.roiskeet / 100, sp = SN(H, W, R, band * 0.9, band * 0.12);
+    const du = f.polyt / 100, dn = N(Math.max(2, band * 0.05));
+    const col = hex(f.kehysvari), pv = hex(f.paperivari);
+    const lo = -inset - band * 1.3, hi = outW + band * 2.1;
+    const cxm = E + w / 2, cym = E + h / 2, hw = w / 2 - r, hh = h / 2 - r;
+    for (let y = 0; y < H; y++) {
+      const qy = Math.abs(y - cym) - hh;
+      for (let x = 0; x < W; x++) {
+        const qx = Math.abs(x - cxm) - hw, d = sdf(qx, qy, r);
+        if (d < lo || d > hi) continue;
+        const sw = clamp((qx - qy) / band * 0.5 + 0.5);
+        const nOut = rough * band * 0.6 * (0.55 * sn(o1, x, y, sw) + 0.3 * sn(o2, x, y, sw) + 0.15 * o3.at(x, y)) + wave * band * 0.9 * ow.at(x, y);
+        const nIn = rough * band * 0.3 * (0.7 * sn(i1, x, y, sw) + 0.3 * i3.at(x, y)) + wave * band * 0.5 * iw.at(x, y);
+        const inner = -inset + nIn, outer = outW + nOut;
+        let a = clamp(d - inner + 0.5) * clamp(outer - d + 0.5);
+        if (spl > 0) {
+          const nO = d > outer ? clamp(1 - (d - outer) / (band * 0.5)) : 0;
+          const nI = d < inner ? clamp(1 - (inner - d) / (band * 0.35)) : 0;
+          if (nO > 0 || nI > 0) a = Math.max(a, clamp((sn(sp, x, y, sw) - (0.97 - 0.25 * spl)) * 8) * Math.max(nO, nI));
+        }
+        if (a <= 0) continue;
+        const dust = du > 0 && a > 0.9 ? clamp((dn.at(x, y) - (0.97 - 0.12 * du)) * 12) * 0.8 : 0;
+        const i = (y * W + x) * 4;
+        for (let k = 0; k < 3; k++) {
+          let v = px[i + k] * (1 - a) + col[k] * a;
+          px[i + k] = v * (1 - dust) + pv[k] * dust;
+        }
+      }
+    }
+    x2.putImageData(id, 0, 0);
+    return c;
+  }
+
+  // ---------- Artkehys: revitty vedos ----------
+  function frameRevitty(img, f, seed) {
+    const w = img.width, h = img.height, s = Math.min(w, h);
+    const band = Math.max(2, f.leveys / 100 * s), inset = band * f.yli / 100, outW = band - inset;
+    const paper = f.paperi / 100 * s;
+    const [W, H] = filmDims(w, h, f), o = (W - w) / 2;
+    const c = mk(W, H), x2 = ctx2d(c);
+    x2.fillStyle = f.tausta || "#1c1c1c"; x2.fillRect(0, 0, W, H); x2.drawImage(img, o, o);
+    const id = x2.getImageData(0, 0, W, H), px = id.data;
+    const R = mulberry(seed), rough = f.rosoisuus / 100, wave = f.aaltoilu / 100, r = f.kulmat / 100 * s;
+    const N = (cell, cx) => new Noise(H, W, cell, R, cx);
+    const t1 = N(s * 0.012), t2 = N(s * 0.004), t3 = N(s * 0.08), ptex = N(s * 0.03);
+    const fo = SN(H, W, R, band * 1.2, band * 0.1), fow = N(s * 0.08), fi = SN(H, W, R, band * 1.0, band * 0.12), fiw = N(s * 0.08);
+    const du = f.polyt / 100, dn = N(Math.max(2, band * 0.05));
+    const bg = hex(f.tausta || "#1c1c1c"), pv = hex(f.paperivari), col = hex(f.kehysvari);
+    const edge = outW + paper, maxTear = rough * s * 0.01 + wave * s * 0.012;
+    const f6 = Math.max(1, s * 0.006), shx = s * 0.004, shy = s * 0.006, Rb = Math.max(1, s * 0.012);
+    const far = edge + maxTear + shx + shy + 3 * Rb;
+    const lo = -inset - band * 1.3, fhi = outW + band * 2.1;
+    const cxm = o + w / 2, cym = o + h / 2, hw = w / 2 - r, hh = h / 2 - r;
+    for (let y = 0; y < H; y++) {
+      const qy = Math.abs(y - cym) - hh, qys = Math.abs(y - shy - cym) - hh;
+      const inY = y >= o && y < o + h;
+      for (let x = 0; x < W; x++) {
+        const qx = Math.abs(x - cxm) - hw, d = sdf(qx, qy, r);
+        if (d < lo || d > far) continue;
+        const i = (y * W + x) * 4;
+        let R0, G0, B0;
+        if (inY && x >= o && x < o + w) { R0 = px[i]; G0 = px[i + 1]; B0 = px[i + 2]; }
+        else {
+          const tear = d > edge - maxTear - 2
+            ? rough * s * 0.01 * (0.6 * t1.at(x, y) + 0.4 * t2.at(x, y)) + wave * s * 0.012 * t3.at(x, y) : 0;
+          const pa = clamp(edge + tear - d + 0.5);
+          const fibre = clamp((edge + tear - d + f6) / f6);
+          const ds = sdf(Math.abs(x - shx - cxm) - hw, qys, r);
+          const shadow = clamp((edge + tear - ds) / (2 * Rb) + 0.5);
+          const k0 = 1 - 0.55 * shadow;
+          R0 = bg[0] * k0; G0 = bg[1] * k0; B0 = bg[2] * k0;
+          const pa3 = Math.max(pa, fibre * 0.35);
+          if (pa3 > 0) {
+            const t = 4 * (0.5 + 0.5 * ptex.at(x, y));
+            R0 = R0 * (1 - pa3) + (pv[0] - t) * pa3; G0 = G0 * (1 - pa3) + (pv[1] - t) * pa3; B0 = B0 * (1 - pa3) + (pv[2] - t) * pa3;
+          }
+        }
+        if (d <= fhi) {
+          const sw = clamp((qx - qy) / band * 0.5 + 0.5);
+          const nOut = rough * band * 0.4 * sn(fo, x, y, sw) + wave * band * 0.4 * fow.at(x, y);
+          const nIn = rough * band * 0.2 * sn(fi, x, y, sw) + wave * band * 0.3 * fiw.at(x, y);
+          const a = clamp(d - (-inset + nIn) + 0.5) * clamp(outW + nOut - d + 0.5);
+          if (a > 0) {
+            R0 = R0 * (1 - a) + col[0] * a; G0 = G0 * (1 - a) + col[1] * a; B0 = B0 * (1 - a) + col[2] * a;
+            if (du > 0 && a > 0.9) {
+              const dd = clamp((dn.at(x, y) - (0.97 - 0.12 * du)) * 12) * 0.8;
+              R0 = R0 * (1 - dd) + pv[0] * dd; G0 = G0 * (1 - dd) + pv[1] * dd; B0 = B0 * (1 - dd) + pv[2] * dd;
+            }
+          }
+        }
+        px[i] = R0; px[i + 1] = G0; px[i + 2] = B0;
+      }
+    }
+    x2.putImageData(id, 0, 0);
+    return c;
+  }
+
+  // ---------- Artkehys: Polaroid ----------
+  function framePolaroid(img, f, seed) {
+    const w = img.width, h = img.height, s = Math.min(w, h);
+    const side = Math.max(2, f.paperi / 100 * s), top = side * 1.2;
+    const [W, H] = filmDims(w, h, f);
+    const x0 = Math.round(side), y0 = Math.round(top);
+    const c = mk(W, H), x2 = ctx2d(c);
+    x2.fillStyle = f.paperivari; x2.fillRect(0, 0, W, H); x2.drawImage(img, x0, y0);
+    const id = x2.getImageData(0, 0, W, H), px = id.data;
+    const R = mulberry(seed), rough = f.rosoisuus / 100, r = f.kulmat / 100 * s;
+    const n1 = new Noise(H, W, s * 0.03, R), n2 = new Noise(H, W, Math.max(2, s * 0.003), R);
+    const n3 = new Noise(H, W, s * 0.06, R), n4 = new Noise(H, W, s * 0.018, R);
+    const du = f.polyt / 100, fn = new Noise(H, W, Math.max(2, s * 0.0025), R);
+    const pc = hex(f.paperivari);
+    const wob = rough * s * 0.003, lip = wob + 0.5, shR = Math.max(1, s * 0.006);
+    const lo = -(lip + wob + shR + 1);
+    const cxm = x0 + w / 2, cym = y0 + h / 2, hw = w / 2 - r, hh = h / 2 - r;
+    for (let y = 0; y < H; y++) {
+      const qy = Math.abs(y - cym) - hh, inY = y >= y0 && y < y0 + h;
+      for (let x = 0; x < W; x++) {
+        const d = sdf(Math.abs(x - cxm) - hw, qy, r);
+        if (d < lo) continue;
+        const i = (y * W + x) * 4;
+        const n = Math.abs(d) < lip + wob + 2 ? wob * (0.65 * n3.at(x, y) + 0.35 * n4.at(x, y)) : 0;
+        const a = clamp(-(d + lip - n) + 0.5);
+        const tex = 1.6 * n1.at(x, y) + 0.8 * n2.at(x, y);
+        let spec = 0;
+        if (du > 0 && a < 1) spec = clamp((fn.at(x, y) - (0.997 - 0.02 * du)) * 40) * (1 - a) * 35;
+        const sh = clamp(1 + (d + lip) / shR), k = 1 - 0.22 * sh * sh;
+        const inside = inY && x >= x0 && x < x0 + w;
+        for (let ch = 0; ch < 3; ch++) {
+          const im = inside ? px[i + ch] * k : 0;
+          px[i + ch] = (pc[ch] + tex) * (1 - a) + im * a - spec;
+        }
+      }
+    }
+    x2.putImageData(id, 0, 0);
+    return c;
+  }
+
+  const STYLES = [["sivellin", "Sivellin (Sloppy)"], ["revitty", "Revitty vedos"], ["polaroid", "Polaroid (leveä alareuna)"]];
+  const OTHER = { viilattu: "Viilattu negatiivikehys", pikafilmi: "Pikafilmi / emulsio", filminauha: "35 mm filminauha", kk66: "6×6-negatiivi" };
+  function frame(img, f, seed) {
+    if (f.tyyli === "revitty") return frameRevitty(img, f, seed);
+    if (f.tyyli === "polaroid") return framePolaroid(img, f, seed);
+    return frameSivellin(img, f, seed);
+  }
+
+  function grow(src, w, h, color, ox, oy) {
+    const c = mk(w, h), x = c.getContext("2d");
+    x.fillStyle = color; x.fillRect(0, 0, w, h); x.drawImage(src, ox, oy);
+    return c;
+  }
+
+  /**
+   * Koko käsittely. src: kuva tai kangas. opts.maxPx: kankaan enimmäispinta-ala (iPad-raja),
+   * opts.preview: pisin sivu esikatselulle (absoluuttiset px-arvot skaalataan samassa suhteessa).
+   * Palauttaa {canvas, note, finalSize}.
+   */
+  function process(src, p, name, opts = {}) {
+    const sw = src.naturalWidth || src.width, sh = src.naturalHeight || src.height;
+    let [w, h] = workDims(sw, sh, p.koko);
+    let note = "";
+    // iPadin kangasraja: valmis kuva enintään maxPx pikseliä
+    const maxPx = opts.maxPx || 15.5e6;
+    const [fw, fh] = simulate(sw, sh, p);
+    let k = 1;
+    if (fw * fh > maxPx) { k = Math.sqrt(maxPx / (fw * fh)) * 0.995; note = "pienennetty iPadin kuvakokorajan vuoksi"; }
+    const finalSize = finalDims(Math.round(fw * k), Math.round(fh * k), p.tulostus);
+    let pxScale = k;
+    if (opts.preview) {
+      const kp = Math.min(1, opts.preview / Math.max(w * k, h * k));
+      k *= kp; pxScale = k;
+    }
+    let im = scaleTo(src, w * k, h * k);
+    if (p.filmi.kaytossa) im = frame(im, p.filmi, hashSeed(`${name}|${p.filmi.siemen}`));
+    if (p.reunukset.kaytossa) {
+      const vp = Math.round((+p.viiva.px || 0) * pxScale) || ((+p.viiva.px || 0) > 0 ? 1 : 0);
+      if (vp > 0) im = grow(im, im.width + 2 * vp, im.height + 2 * vp, p.viiva.vari, vp, vp);
+      let [nw, nh] = padDims(im.width, im.height, p.taytto);
+      if (nw !== im.width || nh !== im.height) im = grow(im, nw, nh, p.taytto.vari, (nw - im.width) >> 1, (nh - im.height) >> 1);
+      const rb = p.reunus.tapa === "px" ? { ...p.reunus, arvo: (+p.reunus.arvo || 0) * pxScale } : p.reunus;
+      [nw, nh] = borderDims(im.width, im.height, rb);
+      if (nw !== im.width || nh !== im.height) im = grow(im, nw, nh, p.reunus.vari, (nw - im.width) >> 1, (nh - im.height) >> 1);
+    }
+    if (!opts.preview) {
+      const [tw, th] = finalDims(im.width, im.height, p.tulostus);
+      if (tw !== im.width || th !== im.height) im = scaleTo(im, tw, th);
+    }
+    return { canvas: im, note, finalSize };
+  }
+
+  return { process, simulate, STYLES, OTHER, hashSeed, mk };
+})();
+
+</script>
+<script>
+/* ===================== Kehys iPad – käyttöliittymä ===================== */
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  const LS = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ei tallennusta */ } },
+  };
+
+  // ---------------- esiasetukset (sama rakenne kuin Macin Kehyksessä) ----------------
+  const FILM = { kaytossa: true, tyyli: "sivellin", leveys: 1.8, yli: 55, paperi: 2.2, alareuna: 27, rosoisuus: 55,
+    aaltoilu: 35, kulmat: 0.6, roiskeet: 40, polyt: 25, lovet: true, kehysvari: "#0b0b0b", paperivari: "#ffffff",
+    tausta: "#1c1c1c", taustaleveys: 5, siemen: 1 };
+  const OUT = { laatu: 94, terav: 0, tapa: "liite", liite: "_kehys", kansio: "", loppu: "ei", loppuleveys: 0 };
+  function preset(name, o = {}) {
+    return {
+      name,
+      koko: o.koko || { tapa: "ei", px: 2048 },
+      filmi: { ...FILM, ...(o.filmi === undefined ? { kaytossa: false } : o.filmi) },
+      reunukset: { kaytossa: !!o.reunukset },
+      viiva: o.viiva || { px: 0, vari: "#000000" },
+      taytto: o.taytto || { suhde: "ei", vari: "#ffffff" },
+      reunus: o.reunus || { tapa: "ei", arvo: 0, vari: "#ffffff" },
+      tulostus: { ...OUT, ...(o.tulostus || {}) },
+      sign: o.sign || { kaytossa: false },
+    };
+  }
+  const BUILTIN = [
+    preset("IG Neliö 1:1, musta viiva, vaal.harmaa reunus", { koko: { tapa: "leveys", px: 1080 }, reunukset: true,
+      viiva: { px: 1, vari: "#000000" }, taytto: { suhde: "ei", vari: "#f8f8f8" },
+      reunus: { tapa: "ps_pros", arvo: 8, vari: "#f8f8f8" }, tulostus: { laatu: 92, liite: "_IG" } }),
+    preset("Artkehys", { filmi: {} }),
+    preset("Artkehys IG 4:5", { koko: { tapa: "pidempi", px: 2400 }, filmi: {}, reunukset: true,
+      taytto: { suhde: "4:5", vari: "#ffffff" }, tulostus: { laatu: 92, liite: "_IG", loppu: "ig", loppuleveys: 1080 } }),
+    preset("Artkehys – revitty vedos", { filmi: { tyyli: "revitty", leveys: 0.9, yli: 50, paperi: 6, rosoisuus: 55,
+      aaltoilu: 30, kulmat: 0.4, roiskeet: 10, polyt: 10 } }),
+    preset("Artkehys – Polaroid", { filmi: { tyyli: "polaroid", paperi: 5.7, alareuna: 27, rosoisuus: 40, kulmat: 0.4,
+      polyt: 15, paperivari: "#f6f5f1" } }),
+  ].map((p) => ({ ...p, _builtin: true }));
+  // Ensimmäisellä käynnistyksellä omaksi esiasetukseksi (Macin näyttökuvan arvoilla – tarkista värit).
+  const STARTER = [preset("Artkehys – revitty vedos – FG MV", { filmi: { tyyli: "revitty", leveys: 0.9, yli: 55,
+    paperi: 2.9, rosoisuus: 55, aaltoilu: 63, kulmat: 0.4, roiskeet: 0, polyt: 14, kehysvari: "#000000",
+    paperivari: "#ffffff", tausta: "#ff0000", taustaleveys: 5, siemen: 71252 } })];
+  const RENAMED = { "Filmikehys": "Artkehys", "Filmikehys IG 4:5": "Artkehys IG 4:5",
+    "Filmikehys – revitty vedos": "Artkehys – revitty vedos" };
+
+  function fill(p) {
+    const base = preset(p.name || "?", { filmi: { kaytossa: false } });
+    base.reunukset.kaytossa = true;           // vanhoissa Macin esiasetuksissa reunukset olivat aina päällä
+    const out = clone(base);
+    for (const [k, v] of Object.entries(p)) {
+      if (v && typeof v === "object" && !Array.isArray(v) && out[k] && typeof out[k] === "object") Object.assign(out[k], v);
+      else out[k] = v;
+    }
+    const t = out.tulostus;
+    if (t && t.loppu == null) t.loppu = (+t.loppuleveys || 0) <= 0 ? "ei" : (+t.loppuleveys === 1080 ? "ig" : "leveys");
+    return out;
+  }
+  const strip = (p) => { const o = {}; for (const k in p) if (!k.startsWith("_")) o[k] = p[k]; return o; };
+  const same = (a, b) => JSON.stringify(strip(a)) === JSON.stringify(strip(b));
+
+  let users = [];                 // omat esiasetukset
+  let presets = [...BUILTIN];
+  let work = {};                  // nimi -> tallentamaton työkopio
+  let cur = 0;
+
+  // ---------------- tallennuspaikka: tämän laitteen selain ----------------
+  async function loadUsers() {
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* ei tukea */ }
+    return LS.get("kehys.presets", null);
+  }
+  async function saveUsers() {
+    LS.set("kehys.presets", users.map(strip));
+  }
+
+  // ---------------- lomake ----------------
+  const ALL = "*";
+  const BRUSH = ["sivellin", "revitty"];
+  const SECTIONS = [
+    { id: "1", title: "1. Työkoko", fields: [
+      { k: "koko.tapa", t: "sel", l: "Skaalaus", o: [["ei", "Ei skaalausta"], ["leveys", "Leveys"], ["korkeus", "Korkeus"], ["pidempi", "Pidempi sivu"]] },
+      { k: "koko.px", t: "rng", l: "Pikseleinä", min: 16, max: 8000, step: 10, u: "px", show: (p) => p.koko.tapa !== "ei" },
+      { t: "hint", l: "Kuva skaalataan tähän kokoon ennen kehystä. Lopullinen tiedostokoko valitaan kohdassa 4." },
+    ] },
+    { id: "2", title: "2. Artkehys", tog: "filmi.kaytossa", fields: [
+      { k: "filmi.tyyli", t: "sel", l: "Tyyli", o: K.STYLES },
+      { k: "filmi.leveys", t: "rng", l: "Kehyksen leveys", min: 0.2, max: 10, step: 0.1, u: "%", st: BRUSH },
+      { k: "filmi.yli", t: "rng", l: "Kuvan päällä", min: 0, max: 100, step: 5, u: "%", st: BRUSH },
+      { k: "filmi.paperi", t: "rng", l: "Paperireunus", l2: { polaroid: "Sivureunus" }, min: 0, max: 15, step: 0.1, u: "%", st: ALL },
+      { k: "filmi.alareuna", t: "rng", l: "Alareuna", min: 5, max: 60, step: 0.5, u: "%", st: ["polaroid"] },
+      { k: "filmi.rosoisuus", t: "rng", l: "Rosoisuus", l2: { polaroid: "Kuva-alan reuna" }, min: 0, max: 100, step: 5, st: ALL },
+      { k: "filmi.aaltoilu", t: "rng", l: "Aaltoilu", min: 0, max: 100, step: 5, st: BRUSH },
+      { k: "filmi.kulmat", t: "rng", l: "Kulmien pyöristys", min: 0, max: 5, step: 0.1, u: "%", st: ALL },
+      { k: "filmi.roiskeet", t: "rng", l: "Roiskeet", min: 0, max: 100, step: 5, st: ["sivellin"] },
+      { k: "filmi.polyt", t: "rng", l: "Pöly", min: 0, max: 100, step: 5, st: ALL },
+      { k: "filmi.kehysvari", t: "col", l: "Kehyksen väri", st: BRUSH },
+      { k: "filmi.paperivari", t: "col", l: "Paperin väri", st: ALL },
+      { k: "filmi.tausta", t: "col", l: "Tausta", st: ["revitty"] },
+      { k: "filmi.taustaleveys", t: "rng", l: "Taustan leveys", min: 0, max: 30, step: 0.5, u: "%", st: ["revitty"] },
+      { k: "filmi.siemen", t: "seed", l: "Satunnaisuus", st: ALL },
+      { t: "hint", l: "Jokainen kuva saa oman, toistettavan kehyksen (tiedostonimi + satunnaisuusluku)." },
+    ] },
+    { id: "3", title: "3. Reunukset", tog: "reunukset.kaytossa", fields: [
+      { t: "sub", l: "Viiva" },
+      { k: "viiva.px", t: "rng", l: "Leveys", min: 0, max: 30, step: 1, u: "px" },
+      { k: "viiva.vari", t: "col", l: "Väri" },
+      { t: "sub", l: "Täyttö kuvasuhteeseen" },
+      { k: "taytto.suhde", t: "sel", l: "Kuvasuhde", o: [["ei", "Ei"], ["1:1", "1:1 neliö"], ["4:5", "4:5 pysty (IG 1080×1350)"],
+        ["3:4", "3:4 pysty (IG 1080×1440)"], ["5:4", "5:4 vaaka"], ["1.91:1", "1,91:1 vaaka (IG 1080×566)"],
+        ["2:3", "2:3 pysty"], ["3:2", "3:2 vaaka"], ["16:9", "16:9 vaaka"], ["9:16", "9:16 pysty"]] },
+      { k: "taytto.vari", t: "col", l: "Väri" },
+      { t: "sub", l: "Reunus" },
+      { k: "reunus.tapa", t: "sel", l: "Tapa", o: [["ei", "Ei reunusta"], ["ps_pros", "Photoshop: % leveydestä ja korkeudesta"],
+        ["pros_pidempi", "Tasainen: % pidemmästä sivusta"], ["px", "Tasainen: px joka sivulle"]] },
+      { k: "reunus.arvo", t: "rng", l: "Arvo", min: 0, max: 200, step: 0.5 },
+      { k: "reunus.vari", t: "col", l: "Väri" },
+    ] },
+    { id: "4", title: "4. Lopullinen koko", fields: [
+      { k: "tulostus.loppu", t: "sel", l: "Koko", o: [["ei", "Ei muutosta"], ["ig", "Instagram – leveys 1080 px"],
+        ["fb", "Facebook – pidempi sivu 2048 px"], ["leveys", "Oma: leveys"], ["pidempi", "Oma: pidempi sivu"]] },
+      { k: "tulostus.loppuleveys", t: "rng", l: "Oma koko", min: 100, max: 8000, step: 10, u: "px",
+        show: (p) => ["leveys", "pidempi"].includes(p.tulostus.loppu) },
+      { t: "hint", l: "Valmis kuva pienennetään tähän kokoon. Pientä kuvaa ei suurenneta." },
+    ] },
+    { id: "5", title: "5. Tallennus", fields: [
+      { k: "tulostus.laatu", t: "rng", l: "JPEG-laatu", min: 50, max: 100, step: 1 },
+      { k: "tulostus.liite", t: "txt", l: "Nimen liite" },
+    ] },
+  ];
+  const get = (p, k) => k.split(".").reduce((o, x) => (o ? o[x] : undefined), p);
+  const set = (p, k, v) => { const ks = k.split("."); const last = ks.pop(); const o = ks.reduce((o, x) => (o[x] = o[x] || {}), p); o[last] = v; };
+
+  const ctl = {};   // avain -> {row, set(v), label}
+  const bodies = {};
+  function buildForm() {
+    const form = $("form"); form.textContent = "";
+    const openState = LS.get("kehys.open", { "1": false, "2": true, "3": true, "4": true, "5": false });
+    for (const sec of SECTIONS) {
+      const d = document.createElement("details"); d.className = "sec"; d.open = !!openState[sec.id];
+      d.addEventListener("toggle", () => { const s = LS.get("kehys.open", openState); s[sec.id] = d.open; LS.set("kehys.open", s); });
+      const sm = document.createElement("summary"); sm.textContent = sec.title;
+      if (sec.tog) {
+        const lab = document.createElement("label"); lab.className = "tog";
+        const cb = document.createElement("input"); cb.type = "checkbox"; cb.id = "f_" + sec.tog.replace(".", "_");
+        lab.addEventListener("click", (e) => e.stopPropagation());
+        cb.addEventListener("change", () => change(sec.tog, cb.checked));
+        lab.append(cb, document.createTextNode("Käytössä"));
+        sm.append(lab);
+        ctl[sec.tog] = { set: (v) => (cb.checked = !!v) };
+      }
+      const body = document.createElement("div"); body.className = "body"; bodies[sec.id] = { el: body, tog: sec.tog };
+      for (const f of sec.fields) body.append(field(f));
+      d.append(sm, body); form.append(d);
+    }
+  }
+  function field(f) {
+    if (f.t === "hint" || f.t === "sub") { const h = document.createElement("div"); h.className = f.t; h.textContent = f.l; return h; }
+    const row = document.createElement("div"); row.className = "f";
+    const lab = document.createElement("label"); lab.textContent = f.l;
+    const c = document.createElement("div"); c.className = "ctl";
+    const id = "f_" + f.k.replace(".", "_"); lab.htmlFor = id;
+    let setter;
+    if (f.t === "sel") {
+      const s = document.createElement("select"); s.id = id;
+      for (const [v, l] of f.o) { const o = document.createElement("option"); o.value = v; o.textContent = l; s.append(o); }
+      s.addEventListener("change", () => change(f.k, s.value));
+      c.append(s); setter = (v) => { if (![...s.options].some((o) => o.value === v)) { const o = document.createElement("option"); o.value = v; o.textContent = (K.OTHER[v] || v) + " (ei iPadilla)"; s.append(o); } s.value = v; };
+    } else if (f.t === "rng") {
+      const r = document.createElement("input"); r.type = "range"; r.min = f.min; r.max = f.max; r.step = f.step; r.setAttribute("aria-label", f.l);
+      const n = document.createElement("input"); n.type = "number"; n.id = id; n.min = f.min; n.step = f.step; n.inputMode = "decimal";
+      r.addEventListener("input", () => { n.value = r.value; change(f.k, +r.value); });
+      n.addEventListener("change", () => { const v = Math.max(f.min, +n.value || 0); r.value = v; change(f.k, v); });
+      c.append(r, n);
+      const u = document.createElement("span"); u.className = "hint unit"; u.textContent = f.u || ""; c.append(u);
+      setter = (v) => { r.value = v; n.value = v; };
+    } else if (f.t === "col") {
+      const i = document.createElement("input"); i.type = "color"; i.id = id;
+      i.addEventListener("input", () => change(f.k, i.value));
+      c.append(i); setter = (v) => (i.value = /^#[0-9a-f]{6}$/i.test(v) ? v : "#000000");
+    } else if (f.t === "txt") {
+      const i = document.createElement("input"); i.type = "text"; i.id = id; i.autocapitalize = "off"; i.spellcheck = false;
+      i.addEventListener("input", () => change(f.k, i.value));
+      c.append(i); setter = (v) => (i.value = v ?? "");
+    } else if (f.t === "seed") {
+      const n = document.createElement("input"); n.type = "number"; n.id = id; n.min = 1; n.max = 99999; n.style.width = "96px";
+      n.addEventListener("change", () => change(f.k, Math.max(1, Math.round(+n.value || 1))));
+      const b = document.createElement("button"); b.className = "btn"; b.type = "button"; b.textContent = "Arvo uusi";
+      b.addEventListener("click", () => { const v = 1 + Math.floor(Math.random() * 99999); n.value = v; change(f.k, v); });
+      c.append(n, b); setter = (v) => (n.value = v);
+    }
+    row.append(lab, c);
+    ctl[f.k] = { row, set: setter, f, lab };
+    return row;
+  }
+
+  // ---------------- tila ----------------
+  const saved = () => presets[cur];
+  const now = () => { const p = saved(); if (!work[p.name]) work[p.name] = clone(p); return work[p.name]; };
+  const dirty = (p) => !!work[p.name] && !same(work[p.name], p);
+
+  function refreshCombo() {
+    const s = $("preset"); s.textContent = "";
+    presets.forEach((p, i) => {
+      const o = document.createElement("option"); o.value = i;
+      o.textContent = p.name + (p._builtin ? "  (perus)" : "") + (dirty(p) ? "  •" : "");
+      s.append(o);
+    });
+    s.value = cur;
+  }
+  function loadForm() {
+    const p = now();
+    for (const [k, c] of Object.entries(ctl)) c.set(get(p, k));
+    updateState();
+    schedule();
+  }
+  function updateState() {
+    const p = saved(), w = now(), d = dirty(p), b = !!p._builtin;
+    const st = $("state");
+    st.className = "state" + (d ? " dirty" : "");
+    st.textContent = b ? (d ? "Perusasetus, muutettu – tallenna muutokset uutena." : "Perusasetus (lukittu).")
+      : (d ? "Muutettu – ei tallennettu." : "Tallennettu" + " tähän laitteeseen.");
+    if (!K.STYLES.some(([k]) => k === w.filmi.tyyli) && w.filmi.kaytossa)
+      st.textContent += ` Tyyli "${K.OTHER[w.filmi.tyyli] || w.filmi.tyyli}" ei ole vielä iPadilla – käytetään sivellintä.`;
+    $("pSave").disabled = !d || b; $("pRevert").disabled = !d; $("pRename").disabled = b; $("pDel").disabled = b;
+    const style = K.STYLES.some(([k]) => k === w.filmi.tyyli) ? w.filmi.tyyli : "sivellin";
+    for (const [k, c] of Object.entries(ctl)) {
+      if (!c.f) continue;
+      let vis = true;
+      if (c.f.st && c.f.st !== ALL) vis = c.f.st.includes(style);
+      if (c.f.show) vis = vis && c.f.show(w);
+      c.row.hidden = !vis;
+      if (c.f.l2) c.lab.textContent = c.f.l2[style] || c.f.l;
+    }
+    for (const b2 of Object.values(bodies)) if (b2.tog) b2.el.classList.toggle("off", !get(w, b2.tog));
+    const opt = $("preset").options[cur];
+    if (opt) opt.textContent = p.name + (b ? "  (perus)" : "") + (d ? "  •" : "");
+  }
+  function change(k, v) {
+    set(now(), k, v);
+    updateState(); schedule();
+  }
+
+  // ---------------- esiasetustoiminnot ----------------
+  function uniq(base) { const names = new Set(presets.map((p) => p.name)); let n = base, k = 2; while (names.has(n)) n = `${base} ${k++}`; return n; }
+  function rebuild(selectName) {
+    presets = [...BUILTIN, ...users];
+    const i = presets.findIndex((p) => p.name === selectName);
+    cur = i >= 0 ? i : 0;
+    LS.set("kehys.last", saved().name);
+    refreshCombo(); loadForm();
+  }
+  let newMode = "new";
+  $("preset").addEventListener("change", (e) => { cur = +e.target.value; LS.set("kehys.last", saved().name); hideRows(); loadForm(); });
+  $("pSave").addEventListener("click", async () => {
+    const p = saved(); if (p._builtin || !dirty(p)) return;
+    const i = users.findIndex((u) => u.name === p.name); users[i] = clone(now()); delete work[p.name];
+    await saveUsers(); rebuild(p.name); say("Esiasetus tallennettu.", "ok");
+  });
+  $("pRevert").addEventListener("click", () => { delete work[saved().name]; loadForm(); refreshCombo(); });
+  $("pNew").addEventListener("click", () => {
+    newMode = "new"; const p = saved();
+    $("newName").value = uniq(p.name + (p._builtin ? " – oma" : " kopio"));
+    $("newRow").hidden = false; $("delRow").hidden = true; $("newName").focus(); $("newName").select();
+  });
+  $("pRename").addEventListener("click", () => {
+    if (saved()._builtin) return; newMode = "rename";
+    $("newName").value = saved().name; $("newRow").hidden = false; $("delRow").hidden = true; $("newName").focus();
+  });
+  $("newCancel").addEventListener("click", hideRows);
+  $("newName").addEventListener("keydown", (e) => { if (e.key === "Enter") $("newOk").click(); if (e.key === "Escape") hideRows(); });
+  $("newOk").addEventListener("click", async () => {
+    const name = $("newName").value.trim(); if (!name) return;
+    const src = saved();
+    if (newMode === "rename") {
+      if (name === src.name) return hideRows();
+      const nn = uniq(name), i = users.findIndex((u) => u.name === src.name);
+      const w = work[src.name]; delete work[src.name];
+      users[i] = { ...users[i], name: nn }; if (w) work[nn] = { ...w, name: nn };
+      await saveUsers(); hideRows(); rebuild(nn); return;
+    }
+    const p = clone(now()); delete p._builtin; p.name = uniq(name);
+    users.push(p); delete work[src.name];
+    await saveUsers(); hideRows(); rebuild(p.name); say("Tallennettu uutena esiasetuksena.", "ok");
+  });
+  $("pDel").addEventListener("click", () => { if (saved()._builtin) return; $("delRow").hidden = false; $("newRow").hidden = true; });
+  $("delCancel").addEventListener("click", hideRows);
+  $("delOk").addEventListener("click", async () => {
+    const p = saved(); users = users.filter((u) => u.name !== p.name); delete work[p.name];
+    await saveUsers(); hideRows(); rebuild(BUILTIN[0].name);
+  });
+  function hideRows() { $("newRow").hidden = true; $("delRow").hidden = true; }
+  $("pImport").addEventListener("click", () => $("importFile").click());
+  $("importFile").addEventListener("change", async (e) => {
+    const file = e.target.files[0]; e.target.value = ""; if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      if (!Array.isArray(data)) throw new Error("tiedostossa ei ole esiasetuslistaa");
+      let n = 0, last = null;
+      for (const raw of data) {
+        if (!raw || typeof raw !== "object" || !raw.name) continue;
+        const p = fill(raw); delete p._builtin;
+        if (RENAMED[p.name]) p.name = RENAMED[p.name];
+        if (BUILTIN.some((b) => b.name === p.name)) p.name += " (Mac)";
+        const i = users.findIndex((u) => u.name === p.name);
+        if (i >= 0) users[i] = p; else users.push(p);
+        n++; last = p.name;
+      }
+      if (!n) throw new Error("tiedostosta ei löytynyt esiasetuksia");
+      await saveUsers(); rebuild(last);
+      say(`Tuotiin ${n} esiasetusta.`, "ok");
+    } catch (err) { say(`Tuonti epäonnistui: ${err.message}. Valitse Macin presets.json tai täältä viety kehys-esiasetukset.json.`, "err"); }
+  });
+
+  // ---------------- kuvat ----------------
+  const images = [];   // {file, name, url, img}
+  let sel = -1;
+  $("add").addEventListener("click", () => $("file").click());
+  $("file").addEventListener("change", (e) => { addFiles([...e.target.files]); e.target.value = ""; });
+  $("clear").addEventListener("click", () => { images.splice(0).forEach((i) => URL.revokeObjectURL(i.url)); sel = -1; renderStrip(); schedule(); });
+  ["dragover", "drop"].forEach((t) => document.addEventListener(t, (e) => {
+    e.preventDefault(); if (t === "drop") addFiles([...e.dataTransfer.files].filter((f) => f.type.startsWith("image/")));
+  }));
+  function addFiles(files) {
+    for (const file of files) images.push({ file, name: file.name, url: URL.createObjectURL(file), img: null });
+    if (files.length && sel < 0) sel = images.length - files.length;
+    renderStrip(); schedule();
+  }
+  function renderStrip() {
+    const s = $("strip"); s.textContent = "";
+    if (!images.length) { const e = document.createElement("div"); e.className = "empty"; e.textContent = "Esimerkkikuva. Lisää omia kuvia Kuvista tai Tiedostoista."; s.append(e); return; }
+    images.forEach((im, i) => {
+      const b = document.createElement("button"); b.className = "thumb" + (i === sel ? " on" : ""); b.type = "button";
+      b.setAttribute("aria-label", im.name);
+      const t = document.createElement("img"); t.src = im.url; t.alt = "";
+      const x = document.createElement("span"); x.className = "x"; x.textContent = "×"; x.setAttribute("role", "button"); x.setAttribute("aria-label", "Poista listalta");
+      x.addEventListener("click", (e) => { e.stopPropagation(); URL.revokeObjectURL(im.url); images.splice(i, 1);
+        if (sel >= images.length) sel = images.length - 1; renderStrip(); schedule(); });
+      b.addEventListener("click", () => { sel = i; renderStrip(); schedule(); });
+      b.append(t, x); s.append(b);
+    });
+  }
+  async function getImg(im) {
+    if (im.img) return im.img;
+    const i = new Image(); i.decoding = "async"; i.src = im.url;
+    await i.decode();
+    im.img = i; return i;
+  }
+  let sample = null;
+  function sampleImage() {
+    if (sample) return sample;
+    const c = K.mk(1800, 1200), x = c.getContext("2d");
+    const g = x.createLinearGradient(0, 0, 0, 1200); g.addColorStop(0, "#1a1410"); g.addColorStop(1, "#050404"); x.fillStyle = g; x.fillRect(0, 0, 1800, 1200);
+    const sp = x.createRadialGradient(980, 380, 20, 980, 520, 620); sp.addColorStop(0, "rgba(255,226,170,.85)"); sp.addColorStop(.45, "rgba(170,90,40,.35)"); sp.addColorStop(1, "rgba(0,0,0,0)");
+    x.fillStyle = sp; x.fillRect(0, 0, 1800, 1200);
+    x.fillStyle = "#0b0907";   // kontrabasistin siluetti
+    x.beginPath(); x.ellipse(930, 760, 150, 260, -0.12, 0, Math.PI * 2); x.fill();
+    x.fillRect(905, 180, 22, 420); x.beginPath(); x.arc(1080, 420, 58, 0, Math.PI * 2); x.fill();
+    x.fillRect(1040, 470, 90, 520);
+    x.fillStyle = "rgba(230,226,218,.35)"; x.font = "500 40px Barlow, sans-serif"; x.fillText("ESIMERKKIKUVA", 60, 1140);
+    sample = c; return c;
+  }
+
+  // ---------------- esikatselu ----------------
+  let timer = 0, gen = 0;
+  function schedule() { clearTimeout(timer); timer = setTimeout(preview, 160); }
+  async function preview() {
+    const my = ++gen;
+    const im = sel >= 0 ? images[sel] : null;
+    $("busy").textContent = "lasketaan…";
+    await new Promise((r) => setTimeout(r, 0));
+    try {
+      const src = im ? await getImg(im) : sampleImage();
+      if (my !== gen) return;
+      const v = $("view"), dpr = Math.min(2, window.devicePixelRatio || 1);
+      const side = Math.max(600, Math.min(1600, Math.max(v.clientWidth, v.clientHeight) * dpr));
+      const p = effective(now());
+      const r = K.process(src, p, im ? im.name : "esimerkki", { preview: side });
+      if (my !== gen) return;
+      const c = $("pv"); c.width = r.canvas.width; c.height = r.canvas.height;
+      c.getContext("2d").drawImage(r.canvas, 0, 0);
+      const [W, H] = r.finalSize;
+      $("info").textContent = `${im ? im.name : "esimerkki"} · valmis kuva ${W} × ${H} px` + (r.note ? ` · ${r.note}` : "");
+      $("busy").textContent = "";
+    } catch (e) {
+      $("busy").textContent = "";
+      $("info").textContent = "Kuvaa ei voitu avata: " + (e && e.message ? e.message : e);
+    }
+  }
+  // tyylit, joita iPad-versio ei vielä osaa → sivellin
+  function effective(p) {
+    if (K.STYLES.some(([k]) => k === p.filmi.tyyli)) return p;
+    const q = clone(p); q.filmi.tyyli = "sivellin"; return q;
+  }
+  window.addEventListener("resize", schedule);
+
+  // ---------------- tallennus ----------------
+  function say(t, cls = "") { const m = $("msg"); m.textContent = t; m.className = "msg " + cls; }
+  const outName = (name, p) => name.replace(/\.[^.]+$/, "") + (p.tulostus.liite || "") + ".jpg";
+  function toJpeg(canvas, q) {
+    return new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error("JPEG-pakkaus epäonnistui"))), "image/jpeg", q / 100));
+  }
+  async function render(im, p) {
+    const src = await getImg(im);
+    const r = K.process(src, p, im.name, {});
+    return { blob: await toJpeg(r.canvas, p.tulostus.laatu || 92), note: r.note };
+  }
+  // Tallennus iPadin jakovalikolla (Tallenna kuva / Tallenna Tiedostoihin); muualla tavallinen lataus.
+  let ready = null;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function deliver(files, okText) {
+    if (navigator.canShare && navigator.canShare({ files })) {
+      try {
+        await navigator.share({ files });
+        ready = null; $("shareReady").hidden = true; say(okText, "ok"); return;
+      } catch (e) {
+        if (e && e.name === "AbortError") { say("Tallennus peruttiin."); return; }
+        if (e && e.name === "NotAllowedError") {
+          // Safari vaatii jakamiselle tuoreen napautuksen – käsittely kesti liian kauan
+          ready = { files, okText }; $("shareReady").hidden = false;
+          $("shareReady").textContent = files.length > 1 ? `Jaa / tallenna ${files.length} kuvaa` : "Jaa / tallenna";
+          say("Valmis – napauta vielä Jaa / tallenna.");
+          return;
+        }
+        throw e;
+      }
+    }
+    for (const f of files) {
+      const u = URL.createObjectURL(f), el = document.createElement("a");
+      el.href = u; el.download = f.name; document.body.append(el); el.click(); el.remove();
+      setTimeout(() => URL.revokeObjectURL(u), 60000);
+      await sleep(400);
+    }
+    say(okText, "ok");
+  }
+  $("shareReady").addEventListener("click", async () => {
+    if (!ready) return;
+    const r = ready;
+    try { await navigator.share({ files: r.files }); ready = null; $("shareReady").hidden = true; say(r.okText, "ok"); }
+    catch (e) { if (e && e.name === "AbortError") say("Tallennus peruttiin."); else say("Jakaminen ei onnistunut: " + (e.message || e), "err"); }
+  });
+  const asFile = (blob, name) => new File([blob], name, { type: blob.type || "image/jpeg" });
+  $("saveOne").addEventListener("click", async () => {
+    if (sel < 0) return say("Lisää ensin kuva.", "err");
+    const p = effective(now()); say("Käsitellään…");
+    await sleep(30);
+    try {
+      const { blob, note } = await render(images[sel], p);
+      await deliver([asFile(blob, outName(images[sel].name, p))], "Valmis" + (note ? ` (${note})` : "") + ".");
+    } catch (e) { say("Tallennus ei onnistunut: " + ((e && e.message) || e), "err"); }
+  });
+  $("saveAll").addEventListener("click", async () => {
+    if (!images.length) return say("Lisää ensin kuvia.", "err");
+    const p = effective(now()), files = [];
+    try {
+      for (let i = 0; i < images.length; i++) {
+        say(`Käsitellään ${i + 1} / ${images.length}…`);
+        await sleep(30);
+        const { blob } = await render(images[i], p);
+        files.push(asFile(blob, outName(images[i].name, p)));
+      }
+      await deliver(files, `Valmis: ${files.length} kuvaa.`);
+    } catch (e) { say("Tallennus ei onnistunut: " + ((e && e.message) || e), "err"); }
+  });
+  $("pExport").addEventListener("click", async () => {
+    if (!users.length) return say("Omia esiasetuksia ei vielä ole.", "err");
+    const f = new File([JSON.stringify(users.map(strip), null, 2)], "kehys-esiasetukset.json", { type: "application/json" });
+    try { await deliver([f], "Esiasetukset viety."); } catch (e) { say("Vienti ei onnistunut: " + (e.message || e), "err"); }
+  });
+
+  // ---------------- käynnistys ----------------
+  buildForm();
+  const last = LS.get("kehys.last", BUILTIN[0].name);
+  cur = Math.max(0, presets.findIndex((p) => p.name === last));
+  refreshCombo(); loadForm(); renderStrip();
+  loadUsers().then(async (list) => {
+    if (list == null) { users = STARTER.map(clone); await saveUsers(); }
+    else users = list.filter((p) => p && p.name).map(fill);
+    rebuild(last);
+  });
+  window.__kehys = { images, now };
+})();
+
+</script>
+<script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
+</body>
+</html>
