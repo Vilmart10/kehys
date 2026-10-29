@@ -1,5 +1,5 @@
 // Kehys – offline-välimuisti. Vaihda VERSIO, kun julkaiset uuden version.
-const VERSIO = "kehys-1";
+const VERSIO = "kehys-2";
 const TIEDOSTOT = ["./", "index.html", "manifest.webmanifest", "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
 
 self.addEventListener("install", (e) => {
